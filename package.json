@@ -1,0 +1,41 @@
+{
+  "name": "ai-storyteller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 说书先生：把中国古典名著讲成现代人和孩子都听得懂的连续故事。",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/src/index.ts",
+    "dev:web": "vite --host 0.0.0.0",
+    "build": "tsc -p tsconfig.server.json && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "ingest:sanguo": "tsx server/scripts/ingest-sanguo.ts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "prewarm:sanguo": "tsx server/scripts/prewarm-sanguo.ts",
+    "ingest:book": "tsx server/scripts/ingest-book.ts"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "nanoid": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest",
+    "dotenv": "latest"
+  },
+  "devDependencies": {
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

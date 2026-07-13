@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+dist-server/
+
+# local environment / secrets
+.env
+.env.*
+!.env.example
+
+# local runtime state
+server/data/generated/*
+!server/data/generated/.gitkeep
+server/data/progress/
+
+# OS/editor noise
+.DS_Store
+*.log
