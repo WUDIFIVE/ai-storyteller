@@ -68,6 +68,7 @@ function App() {
   const selectedChapter = chapters.find(c => c.id === chapterId);
   const currentBook = books.find(b => b.id === bookId);
   const nextChapter = selectedChapter ? chapters.find(c => c.index === selectedChapter.index + 1) : undefined;
+  const currentBookJobs = jobs.filter(j => j.bookId === bookId);
   const jobPercent = activeJob ? Math.round(((activeJob.completed + activeJob.skipped + activeJob.failed) / Math.max(activeJob.total, 1)) * 100) : 0;
 
   useEffect(() => {
@@ -274,7 +275,7 @@ function App() {
     <main className="workspace-grid">
       <aside className="panel library-panel">
         <div className="panel-title"><BookOpen size={18}/><span>书库与章节</span></div>
-        {books.map(b => <button key={b.id} className={`book-card ${b.id === bookId ? 'selected' : ''}`} onClick={() => { stopSpeak(); setBookId(b.id); setEpisode(null); setGraph(null); setEpisodeStatus(''); }}>
+        {books.map(b => <button key={b.id} className={`book-card ${b.id === bookId ? 'selected' : ''}`} onClick={() => { stopSpeak(); setBookId(b.id); setEpisode(null); setGraph(null); setActiveJob(null); setGraphStatus(''); setPrewarmStatus(''); setEpisodeStatus(''); }}>
           <strong>{b.title}</strong><small>{b.author}</small><span>{b.description}</span>
         </button>)}
         {progress && <button className="continue-card" onClick={() => { stopSpeak(); setChapterId(progress.chapterId); setAudience(progress.audience); setStyle(progress.style); }}>
@@ -352,7 +353,7 @@ function App() {
           <small>完成 {activeJob.completed} · 跳过 {activeJob.skipped} · 失败 {activeJob.failed} / {activeJob.total}</small>
           <pre>{activeJob.logs.slice(-8).join('\n')}</pre>
         </div>}
-        {jobs.length > 0 && <div className="mini-jobs">{jobs.slice(0, 3).map(j => <button key={j.id} onClick={() => setActiveJob(j)}>{j.status} · {j.audience}/{j.style} · {j.completed + j.skipped}/{j.total}</button>)}</div>}
+        {currentBookJobs.length > 0 && <div className="mini-jobs">{currentBookJobs.slice(0, 3).map(j => <button key={j.id} onClick={() => setActiveJob(j)}>{j.status} · {j.audience}/{j.style} · {j.completed + j.skipped}/{j.total}</button>)}</div>}
 
         <div className="divider"/>
         <div className="panel-title compact"><Network size={17}/><span>人物图谱</span></div>

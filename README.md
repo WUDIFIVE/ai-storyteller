@@ -1,18 +1,178 @@
 # AI 说书先生
 
-一个开源的 AI 名著讲书产品原型：把《三国演义》《西游记》《红楼梦》等经典名著，讲成现代人和孩子都听得懂、听得进去的连续故事。
+AI 说书先生是一个开源的经典阅读与一键朗读 Web App。它的目标不是做一个问答助手，也不是做一个音频下载站，而是把难读、长篇、语言门槛较高的经典文本，转化成现代人和孩子都更容易进入的“讲述版阅读内容”。
 
-当前 MVP 聚焦《三国演义》：
+用户可以选择书籍和章节，生成一篇适合阅读、也适合浏览器朗读的讲书稿：想自己看就自己看，想偷懒就点一下“朗读”，让手机或电脑浏览器读给你听。
 
-- 内置书籍与章节列表
-- 支持导入本地无噪声《三国演义》全文
-- 按“第 X 回”自动切分章节
-- 生成成人版 / 儿童版讲书稿
-- 支持现代白话、评书、电视剧解说、睡前故事四种风格
-- 每集包含前情提要、正文讲述、本集重点、人物关系、下一集悬念
-- 浏览器 Web Speech TTS：优先选择系统中文音色
-- 边听边问的问答入口占位
-- 无外部模型也能用本地规则生成器跑通完整功能
+> 当前定位：阅读内容优先，一键朗读辅助。
+
+## Screenshots
+
+后续可以把产品截图放在：
+
+```text
+docs/images/
+```
+
+建议预留：
+
+```text
+docs/images/home.png
+docs/images/reader.png
+docs/images/graph.png
+docs/images/mobile.png
+```
+
+## 为什么做这个项目
+
+很多经典作品很重要，但现代读者很难稳定读下去：
+
+- 古典名著有文言、半文言、古白话，门槛高；
+- 外国名著原文或译名不统一，进入成本高；
+- 长篇小说人物多、关系复杂，容易忘；
+- 短视频时代注意力碎片化，完整阅读越来越难；
+- 儿童也适合接触经典，但需要更温和、更清楚的讲法。
+
+AI 说书先生试图做一件事：
+
+```text
+把经典作品讲清楚、讲好听、讲得能继续读下去。
+```
+
+## 核心思路
+
+一开始我们尝试让模型直接输出完整 JSON，但实践后发现不稳定：模型容易输出坏 JSON、串书、耗时长。现在项目采用更稳的工程分工：
+
+```text
+模型只负责最有价值的部分：生成讲书正文。
+程序负责结构化：标题、前情提要、摘要、人物、重点、下一章悬念。
+规则负责安全与一致性：防串书、固定译名、章节缓存、人物图谱。
+浏览器负责朗读：声音在用户自己的手机/电脑里播放。
+```
+
+也就是说，模型不是万能后端，而是“讲述稿生成器”。能用规则稳定完成的事情，不交给模型。
+
+## 当前内置书籍
+
+仓库已包含原文和结构化章节数据：
+
+| 书籍 | ID | 语言 | 说明 |
+| --- | --- | --- | --- |
+| 三国演义 | `sanguo` | 中文 | 章回体历史演义，适合评书风格和人物图谱 |
+| 红楼梦 | `honglou` | 中文 | 人物关系复杂，适合细腻讲述和图谱 |
+| 傲慢与偏见 | `pride-prejudice` | 英文原文 -> 中文讲述 | 使用固定译名表 |
+| 福尔摩斯归来记 | `sherlock-return` | 英文原文 -> 中文讲述 | 13 个故事，适合悬疑讲述 |
+| 格列佛游记 | `gulliver` | 英文原文 -> 中文讲述 | 旅行与讽刺故事 |
+
+英文原文不会被覆盖翻译。项目保留英文 source，通过固定译名表约束模型生成中文讲述。
+
+## 核心功能
+
+### 1. 书籍与章节
+
+- 书架展示多本书；
+- 按章节阅读；
+- 记录继续听/继续读位置；
+- 支持中文章回体和英文 Project Gutenberg 类文本导入。
+
+### 2. AI 讲书稿生成
+
+- 成人深读：保留复杂人性、时代背景、战争/权谋/情感层次；
+- 儿童柔化：弱化血腥、恐怖、成人化表达，强调友情、勇气、责任、智慧；
+- 支持风格：现代白话、评书说书、电视剧解说、睡前故事；
+- 模型只输出正文，结构由程序组装，降低坏 JSON 风险。
+
+### 3. 阅读体验
+
+- 正文阅读优先；
+- 字号调节；
+- 行距调节；
+- 当前朗读段落高亮；
+- 自动滚动到当前朗读段落；
+- 下一回 / 下一回并朗读。
+
+### 4. 一键朗读
+
+- 使用浏览器 Web Speech API；
+- 声音在用户手机/电脑浏览器中播放，不依赖 Linux 服务器声卡；
+- 支持音色、语速、音调；
+- 移动端通常需要用户点击后才能播放。
+
+### 5. 固定译名表
+
+英文书通过 `server/data/glossaries/*.json` 固定人名、地名和作品专名，例如：
+
+- Elizabeth Bennet -> 伊丽莎白·班纳特
+- Mr. Darcy -> 达西先生
+- Sherlock Holmes -> 夏洛克·福尔摩斯
+- Baker Street -> 贝克街
+- Lemuel Gulliver -> 莱缪尔·格列佛
+
+这样能避免同一本书里译名飘忽不定。
+
+### 6. 轻量人物图谱
+
+人物图谱不是重型图数据库，而是从已生成章节中汇总出的 JSON 图：
+
+```ts
+{
+  nodes: [
+    { id: '刘备', appearances: 5, chapters: ['sanguo-001'] }
+  ],
+  links: [
+    { source: '刘备', target: '关羽', weight: 3 }
+  ]
+}
+```
+
+它用于辅助阅读：谁出现过、和谁经常同章出现、在哪些章节出现。
+
+### 7. 批量预热
+
+可以提前生成前 N 章内容，之后打开章节会直接读取缓存。
+
+- 支持按当前书预热；
+- 有任务状态和日志；
+- 某一章失败不会中断全部任务。
+
+## 技术栈
+
+- Frontend: React + Vite + TypeScript
+- Backend: Express + TypeScript
+- AI Provider: OpenAI-compatible Chat Completions
+- TTS: Browser Web Speech API
+- Storage: Local JSON files
+- Book data: Raw text + structured chapter JSON
+- Graph: Lightweight JSON graph generated from episode character cards
+
+## 项目结构
+
+```text
+src/
+  main.tsx                    # React 单页应用
+  styles.css                  # UI 样式
+
+server/
+  src/
+    index.ts                  # Express API
+    ai/provider.ts            # 讲书正文生成与规则组装
+    content/books.ts          # 书籍、章节、译名表读取
+    store/episodes.ts         # 生成结果缓存
+    store/graph.ts            # 轻量人物图谱
+    store/progress.ts         # 本地阅读进度
+    jobs/prewarm.ts           # 批量预热任务
+  scripts/
+    ingest-sanguo.ts          # 三国导入脚本
+    ingest-book.ts            # 通用书籍导入脚本
+  data/
+    raw/                      # 原始全文 txt，入仓
+    books/                    # 结构化章节 JSON，入仓
+    glossaries/               # 固定译名表，入仓
+    generated/                # 生成缓存，本地忽略
+    progress/                 # 本地进度，本地忽略
+
+docs/images/                  # README 图片预留目录
+```
 
 ## 快速开始
 
@@ -21,109 +181,106 @@ npm install
 npm run dev
 ```
 
-打开 Vite 显示的本地地址即可。
-
-## 导入完整《三国演义》
-
-把你手上的无噪声全文保留原始书名，放到：
-
-```bash
-server/data/raw/三国演义.txt
-```
-
-然后运行：
-
-```bash
-npm run ingest:sanguo
-```
-
-脚本会生成：
-
-```bash
-server/data/books/sanguo.json
-```
-
-原始文件名保留为中文书名，生成的结构化 JSON 仍固定为 `sanguo.json`，方便代码引用与后续追溯。
-
-## 推荐后续接入真实模型
-
-当前仓库为了开源演示和安全，默认使用本地规则生成器。后续建议在 `server/src/ai/provider.ts` 中接入任意 OpenAI-compatible 服务、DeepSeek、通义、智谱或本地模型。
-
-建议 Provider 输入保持：
-
-- 书名
-- 当前章节原文
-- 当前章节标题
-- 前几回摘要
-- 目标听众 adult / child
-- 讲述风格 modern / pingshu / drama / bedtime
-
-输出保持 `StoryEpisode` 结构即可。
-
-## 为什么先用浏览器 TTS
-
-这个项目是开源、不收费方向。MVP 阶段先使用浏览器内置 Web Speech：
-
-- 零后端音频成本
-- 不需要复杂音色授权
-- 常见系统有中文普通话音色
-- 可以完整验证“讲书稿 + 播放器 + 进度/人物卡”的产品体验
-
-后续可以扩展：
-
-- Edge / Azure Speech
-- 火山引擎 TTS
-- Fish Speech / GPT-SoVITS 自托管
-- ElevenLabs 或其他云端 TTS
-- 父母授权音色克隆
-
-## 项目结构
+打开：
 
 ```text
-server/
-  scripts/ingest-sanguo.ts      # 三国全文导入脚本
-  src/content/books.ts          # 书籍与章节读取
-  src/ai/prompt.ts              # 讲书提示词
-  src/ai/provider.ts            # 生成器接口，默认本地规则版
-  src/store/episodes.ts         # 生成结果缓存
-  src/index.ts                  # Express API
-src/
-  main.tsx                      # React 单页应用
-  styles.css                    # UI 样式
+http://localhost:5173/
 ```
+
+Vite 会把 `/api` 代理到后端 `http://localhost:8787`。
+
+## 配置模型
+
+复制示例配置为本地配置文件，然后填入自己的模型服务信息。真实本地配置文件不会提交到 Git。
+
+```bash
+cp .env.example .env
+```
+
+推荐配置：
+
+```bash
+AI_PROVIDER=openai-compatible
+AI_BASE_URL=https://your-openai-compatible-endpoint/v1
+AI_MODEL=your-model-name
+AI_API_KEY=your-private-key
+
+AI_TEMPERATURE=0.45
+AI_MAX_TOKENS=2600
+AI_NO_THINK=true
+AI_CHUNK_SUMMARY_MODE=off
+AI_CONSISTENCY_RETRIES=1
+```
+
+如果不配置模型，项目会使用本地规则生成器，方便开源用户先跑通流程。
+
+## 导入更多书籍
+
+### 中文章回体
+
+```bash
+npm run ingest:book -- --id=xiyou --title=西游记 --author=吴承恩 --raw=server/data/raw/西游记.txt --source-language=zh
+```
+
+### 英文原文，中文讲述
+
+```bash
+npm run ingest:book -- --id=pride-prejudice --title=傲慢与偏见 --author="Jane Austen" --raw=server/data/raw/傲慢与偏见.txt --source-language=en --glossary=server/data/glossaries/pride-prejudice.json
+```
+
+导入器会尽量识别：
+
+- 第 X 回 / 第 X 章 / 第 X 节 / 第 X 卷
+- CHAPTER I
+- PART I
+- THE ADVENTURE OF ...
+
+如果没有明显章节标记，会按段落长度粗分。
+
+## API 概览
+
+```text
+GET  /api/health
+GET  /api/books
+GET  /api/books/:bookId/chapters
+GET  /api/books/:bookId/chapters/:chapterId/episode
+POST /api/books/:bookId/chapters/:chapterId/episode
+GET  /api/books/:bookId/graph
+GET  /api/jobs
+GET  /api/jobs/:jobId
+POST /api/books/:bookId/prewarm
+GET  /api/progress/:bookId
+POST /api/progress/:bookId
+```
+
+## Git 与数据说明
+
+入仓：
+
+- `server/data/raw/*.txt`
+- `server/data/books/*.json`
+- `server/data/glossaries/*.json`
+
+不入仓：
+
+- `.env`
+- `server/data/generated/*.json`
+- `server/data/progress/`
+- `dist/`
+- `node_modules/`
+
+这样用户 clone 后可以直接看到内置书籍；同时不会带上你的模型密钥、本地生成缓存和阅读进度。
 
 ## 路线图
 
-- [ ] 接入真实 LLM Provider
-- [ ] 章节级摘要链：生成第 N 回时自动读取前 N-1 回摘要
-- [ ] 人物关系图谱持久化
-- [ ] 用户播放进度与收藏
-- [ ] SRT 字幕与音频时间轴
-- [ ] 云端朗读引擎与朗读缓存
-- [ ] Whisper / ASR 语音提问
-- [ ] 多书籍导入：西游记、红楼梦、水浒传
-- [ ] 儿童内容安全策略与家长模式
+- [ ] 移动端阅读布局继续优化
+- [ ] 阅读设置持久化
+- [ ] 自动下一章开关
+- [ ] 更丰富的固定译名表
+- [ ] 图谱关系类型：敌对、亲属、师友、婚恋、阵营
+- [ ] 可选云端朗读引擎
+- [ ] 更多经典作品
 
 ## License
 
 AGPL-3.0-or-later
-
-## 导入更多书籍
-
-通用导入脚本支持按“第 X 回/章/节/卷”切分；如果没有明显章节标记，会按段落长度粗分。
-
-```bash
-npm run ingest:book -- --id=xiyou --title=西游记 --author=吴承恩 --raw=server/data/raw/西游记.txt
-npm run ingest:book -- --id=honglou --title=红楼梦 --author=曹雪芹 --raw=server/data/raw/红楼梦.txt
-npm run ingest:book -- --id=pride-prejudice --title=傲慢与偏见 --author=Jane\ Austen --raw=server/data/raw/傲慢与偏见.txt
-```
-
-推荐下一批书：
-
-- 《西游记》：故事性强，儿童/成人都适合。
-- 《红楼梦》：人物关系和情绪层次丰富，适合测试图谱与细腻讲述。
-- 《水浒传》：人物群像和章节冲突明显。
-- 《小王子》：篇幅短，适合测试儿童/成人双版本。
-- 《傲慢与偏见》：适合测试外文小说的现代中文讲述。
-- 《福尔摩斯探案集》：适合连续故事和悬念讲述。
-- 《鲁滨逊漂流记》：冒险叙事清晰，适合儿童版。

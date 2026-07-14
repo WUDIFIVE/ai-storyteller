@@ -106,7 +106,7 @@ async function generateRemoteScript(input: ProviderInput, attempt: number) {
   const content = await chatText(prompt, maxTokens);
   const script = cleanModelText(content);
   if (script.length < 80) throw new Error(`script too short: ${script.length}`);
-  assertNoCrossBookContent(script);
+  assertNoCrossBookContent(input, script);
   return script;
 }
 
@@ -120,9 +120,9 @@ function buildScriptPrompt(input: ProviderInput, attempt: number) {
     drama: '电视剧解说：有镜头感、冲突感、人物动机和连续剧追更感。',
     bedtime: '睡前故事：舒缓、温和、情绪稳定，避免强刺激。'
   };
-  const retry = attempt > 0 ? '\n重要纠偏：上一次输出跑偏。请严格只讲当前给定的《三国演义》章节，不要输出西游记、红楼梦、水浒传或其他书内容。' : '';
+  const retry = attempt > 0 ? `\n重要纠偏：上一次输出跑偏。请严格只讲当前给定的《${input.bookTitle}》章节，不要输出其他书内容。` : '';
   const text = input.chapter.text.slice(0, 12000);
-  return `你是一位 AI 说书先生。你的任务只有一个：把给定章节改写成适合 TTS 朗读的中文讲书正文。\n\n不要输出 JSON。不要输出标题。不要输出字段名。不要 Markdown。只输出正文段落。\n\n书名：《${input.bookTitle}》\n章节：第${input.chapter.index}回《${input.chapter.title}》\n\n${audienceRule}\n讲述风格：${styleRule[input.style]}\n\n前情摘要：\n${input.previous || '暂无，这是开篇。'}\n\n硬性要求：\n1. 只根据下面的当前章节原文讲述，不编造关键情节。\n2. 严禁串书，严禁出现孙悟空、唐僧、天宫、蟠桃、林黛玉、贾宝玉、宋江、武松等其他名著人物或事件。\n3. 正文要有前情承接、主要情节、人物动机和本回收束。\n4. 成人版 900-1800 字，儿童版 700-1400 字。\n5. 段落自然分隔，方便朗读。${retry}\n\n当前章节原文：\n${text}`;
+  return `你是一位 AI 说书先生。你的任务只有一个：把给定章节改写成适合 TTS 朗读的中文讲书正文。\n\n不要输出 JSON。不要输出标题。不要输出字段名。不要 Markdown。只输出正文段落。\n\n书名：《${input.bookTitle}》\n章节：第${input.chapter.index}回《${input.chapter.title}》\n\n${audienceRule}\n讲述风格：${styleRule[input.style]}\n\n前情摘要：\n${input.previous || '暂无，这是开篇。'}\n\n硬性要求：\n1. 只根据下面的当前章节原文讲述，不编造关键情节。\n2. 严禁串书：只能讲当前书名、当前章节和下方原文，不要混入其他书的人物或事件。\n3. 正文要有前情承接、主要情节、人物动机和本回收束。\n4. 成人版 900-1800 字，儿童版 700-1400 字。\n5. 段落自然分隔，方便朗读。${retry}\n\n当前章节原文：\n${text}`;
 }
 
 async function chatText(prompt: string, tokens: number) {
@@ -228,13 +228,13 @@ function buildKeyPoints(input: ProviderInput, characters: CharacterCard[]) {
     gulliver: '关注旅行见闻背后的讽刺与社会观察'
   };
   points.push(input.audience === 'child' ? '关注人物的勇气、责任与选择' : (adultFocus[input.bookId] || '关注人物动机、关系变化与主题表达'));
-  points.push('为下一回的局势变化建立期待');
+  points.push('为下一章/下一回的故事推进建立期待');
   return points;
 }
 
 function buildNextHook(input: ProviderInput, characters: CharacterCard[]) {
   const lead = characters[0]?.name ? `${characters[0].name}等人的选择` : '这一回埋下的线索';
-  return `下一回，${lead}会继续推动局势变化，新的冲突也将浮出水面。`;
+  return `下一章，${lead}会继续推动故事向前，新的线索、关系或转折也会逐渐展开。`;
 }
 
 function extractCharacters(input: ProviderInput, script: string): CharacterCard[] {
@@ -271,8 +271,8 @@ function localScript(input: ProviderInput) {
   const gentle = input.audience === 'child';
   const styleLead: Record<StoryStyle, string> = {
     modern: '今天我们用现代人的话，来听懂这一回。',
-    pingshu: '列位，书接上文，乱世帷幕一开，英雄便要登场。',
-    drama: '如果把这一回拍成电视剧，镜头会先落在风雨飘摇的天下。',
+    pingshu: `列位，书接上文，《${input.bookTitle}》这一章的故事继续展开。`,
+    drama: `如果把这一章拍成电视剧，镜头会先落在人物所处的环境与关系上。`,
     bedtime: '今晚，我们慢慢讲一个发生在很久以前的故事。'
   };
   const raw = input.chapter.text.replace(/\s+/g, '');
@@ -298,15 +298,22 @@ function cleanModelText(content: string) {
 function validateEpisodeConsistency(input: ProviderInput, episode: StoryEpisode) {
   if (input.bookId !== 'sanguo') return;
   const text = [episode.title, episode.recap, episode.script, episode.summary, episode.nextHook, episode.keyPoints.join(' '), episode.characters.map(c => c.name).join(' ')].join('\n');
-  assertNoCrossBookContent(text);
+  assertNoCrossBookContent(input, text);
   const anchors = chapterAnchors(input);
   if (anchors.length && !anchors.some(a => text.includes(a))) {
     throw new Error(`输出缺少当前章节锚点：${anchors.slice(0, 8).join('、')}`);
   }
 }
 
-function assertNoCrossBookContent(text: string) {
-  const forbidden = ['孙悟空', '悟空', '唐僧', '猪八戒', '沙僧', '天宫', '蟠桃', '玉皇', '玉皇大帝', '观音', '如来', '取经', '林黛玉', '贾宝玉', '武松', '宋江'];
+function assertNoCrossBookContent(input: ProviderInput, text: string) {
+  const forbiddenByBook: Record<string, string[]> = {
+    sanguo: ['孙悟空', '悟空', '唐僧', '猪八戒', '沙僧', '天宫', '蟠桃', '玉皇', '玉皇大帝', '观音', '如来', '取经', '林黛玉', '贾宝玉', '武松', '宋江'],
+    honglou: ['孙悟空', '唐僧', '猪八戒', '天宫', '蟠桃', '刘备', '关羽', '张飞', '曹操', '福尔摩斯', '达西先生'],
+    'pride-prejudice': ['孙悟空', '唐僧', '刘备', '关羽', '张飞', '曹操', '贾宝玉', '林黛玉', '福尔摩斯', '格列佛'],
+    'sherlock-return': ['孙悟空', '唐僧', '刘备', '关羽', '张飞', '曹操', '贾宝玉', '林黛玉', '达西先生', '格列佛'],
+    gulliver: ['孙悟空', '唐僧', '刘备', '关羽', '张飞', '曹操', '贾宝玉', '林黛玉', '达西先生', '福尔摩斯']
+  };
+  const forbidden = forbiddenByBook[input.bookId] || [];
   const hit = forbidden.find(word => text.includes(word));
   if (hit) throw new Error(`输出疑似串书，包含禁词「${hit}」`);
 }
