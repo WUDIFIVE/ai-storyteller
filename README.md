@@ -216,26 +216,129 @@ AI_CONSISTENCY_RETRIES=1
 
 ## 导入更多书籍
 
-### 中文章回体
+### 适用场景
+
+导入脚本适合以下文本：
+
+- 有清晰章节标记的中文章回体（第 X 回 / 第 X 章 / 第 X 节 / 第 X 卷）
+- 有清晰章节标记的英文文本（CHAPTER I / Chapter 1 / PART I / THE ADVENTURE OF...）
+- Project Gutenberg 格式文本（脚本会自动清理头尾元数据）
+
+**不适合的场景**：
+
+- OCR 扫描文本，噪声多、段落断裂严重
+- 没有明显章节标记的自由文本
+- 中英文混排且没有统一章节标记
+- 大量脚注、批注、旁批混入正文
+
+如果文本不适合自动导入，建议先手动清理章节标记，再运行脚本。
+
+### 第一步：准备原文
+
+把原文 txt 放到：
+
+```text
+server/data/raw/
+```
+
+文件名建议保留原始书名，方便追溯。例如：
+
+```text
+server/data/raw/西游记.txt
+server/data/raw/小王子.txt
+server/data/raw/福尔摩斯_归来记.txt
+```
+
+### 第二步：中文章回体导入
 
 ```bash
 npm run ingest:book -- --id=xiyou --title=西游记 --author=吴承恩 --raw=server/data/raw/西游记.txt --source-language=zh
 ```
 
-### 英文原文，中文讲述
+参数说明：
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `--id` | 是 | 英文 ID，例如 `xiyou`、`honglou` |
+| `--title` | 是 | 书名，中文或英文 |
+| `--author` | 否 | 作者，默认 `佚名` |
+| `--raw` | 是 | 原文路径 |
+| `--source-language` | 否 | 原文语言，默认 `zh` |
+| `--description` | 否 | 书籍简介，默认 `由本地全文导入生成。` |
+
+### 第三步：英文原文导入（中文讲述）
+
+英文原文不会翻译成中文原文。导入后原文仍为英文，但生成讲述时模型会按固定译名表输出中文。
 
 ```bash
 npm run ingest:book -- --id=pride-prejudice --title=傲慢与偏见 --author="Jane Austen" --raw=server/data/raw/傲慢与偏见.txt --source-language=en --glossary=server/data/glossaries/pride-prejudice.json
 ```
 
-导入器会尽量识别：
+多了一个参数：
 
-- 第 X 回 / 第 X 章 / 第 X 节 / 第 X 卷
-- CHAPTER I
-- PART I
-- THE ADVENTURE OF ...
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `--glossary` | 否 | 固定译名表路径 |
 
-如果没有明显章节标记，会按段落长度粗分。
+### 第四步：创建固定译名表（英文书推荐）
+
+英文书建议创建术语表，防止人名、地名在生成时飘忽不定。
+
+在 `server/data/glossaries/` 下新建 JSON 文件：
+
+```json
+{
+  "terms": {
+    "Elizabeth Bennet": "伊丽莎白·班纳特",
+    "Mr. Darcy": "达西先生",
+    "Pemberley": "彭伯里",
+    "Longbourn": "浪博恩",
+    "Netherfield": "尼日斐花园"
+  }
+}
+```
+
+命名建议：
+
+```text
+server/data/glossaries/your-book-id.json
+```
+
+### 第五步：验证导入
+
+导入后刷新页面，书库应该能看到新书。
+
+也可以直接检查 JSON：
+
+```bash
+node -e "const b=require('./server/data/books/xiyou.json'); console.log(b.title, b.chapters.length, b.chapters[0].title)"
+```
+
+确认章节数、标题、语言字段是否正确。
+
+### 第六步：预热章节
+
+导入后可以先预热几章，看生成效果。
+
+在页面上选择新书，点击右侧"批量预热"按钮即可。也可以用命令行：
+
+```bash
+# 三国专用预热脚本
+npm run prewarm:sanguo -- 3 adult pingshu --refresh
+```
+
+其他书需要在页面上使用批量预热功能。
+
+### 导入失败怎么办
+
+如果导入后发现章节数不对、标题乱码、或章节内容混在一起，大概率是原文格式不适合自动切分。建议：
+
+1. 检查原文是否有统一章节标记（例如 `第X回`、`CHAPTER I`）
+2. 如果原文有目录/插图/出版信息干扰，脚本会尽量清理，但有时需要手动删除
+3. 如果原文没有章节标记，脚本会按段落长度粗分，质量不可控
+4. 英文书标题如果出现 `[Illustration]` 等残留，说明原文有古腾堡插图标记，通常不影响正文
+
+如果手动清理后仍不理想，这个场景目前不适合自动导入。可以考虑先手动切分章节内容，再批量导入。
 
 ## API 概览
 
